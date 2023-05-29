@@ -1,0 +1,51 @@
+version: "3"
+networks:
+  kpo:
+    external: true
+services:
+  db:
+    image: postgres:latest
+    network_mode: bridge
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: db
+      APP_DB_USER: docker
+      APP_DB_PASS: docker
+    healthcheck:
+      test: PGPASSWORD='root' psql -U root --command='SELECT 1' --dbname=db
+      interval: 1s
+      timeout: 2s
+      retries: 5
+  auth:
+    build: ./auth-app/
+    network_mode: bridge
+    ports:
+      - "8003:8003"
+    environment:
+      - DB_URL=postgresql://root:root@db/db?sslmode=disable
+      - PORT=8003
+    restart: on-failure
+    depends_on:
+      db:
+        condition: service_healthy
+    links:
+      - db
+  order:
+    build: ./order-app/
+    network_mode: bridge
+    ports:
+      - "8004:8004"
+    environment:
+      - DB_URL=postgresql://root:root@db/db?sslmode=disable
+      - PORT=8004
+    restart: on-failure
+    depends_on:
+      db:
+        condition: service_healthy
+    links:
+      - db
